@@ -1,9 +1,9 @@
 use crate::*;
 
-use bevy_rapier2d::prelude::*;
-use ron::*;
-use std::fs;
-use std::io::Write;
+// use bevy_rapier2d::prelude::*;
+// use ron::*;
+// use std::fs;
+// use std::io::Write;
 
 #[derive(Component)]
 struct Polygon {

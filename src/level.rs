@@ -1,7 +1,4 @@
-use std::f32::consts::E;
-
-use bevy::{render::render_resource::Texture, sprite::Anchor};
-use bevy_rapier2d::{parry::shape::HeightField, rapier::control::EffectiveCharacterMovement};
+use bevy::sprite::Anchor;
 
 use crate::{mesh_gen::ImageColliderMap, *};
 
@@ -65,7 +62,7 @@ pub fn add_physics(
             let contour = opt_contour.unwrap();
             // dbg!(&contour.vertices);
             let line_strings = contour.to_simplified_line_strings(1);
-            KinematicCharacterController::
+            
             for line_string in line_strings.iter() {
                 let first = points.len();
                 for point in line_string.0.iter() {

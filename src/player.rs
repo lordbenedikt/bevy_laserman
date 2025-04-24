@@ -1,5 +1,3 @@
-use bevy_rapier2d;
-
 use crate::*;
 
 #[derive(Component)]
@@ -9,7 +7,6 @@ pub struct PlayerMarker;
 pub struct Player {
     pub entity: Option<Entity>,
     pub sprite_entity: Option<Entity>,
-    pub on_ground: bool,
     pub move_direction: i32,
     pub velocity: Vec2,
     pub fall_speed: f32,
@@ -20,7 +17,6 @@ impl Default for Player {
         return Player {   
             entity: None,
             sprite_entity: None,
-            on_ground: false,
             move_direction: 0,
             velocity: Vec2::default(),
             fall_speed: 1.0,
@@ -39,6 +35,7 @@ pub fn system_set() -> SystemSet {
     SystemSet::new()
         .with_system(player_run_walk)
         .with_system(player_fall)
+        .with_system(player_jump)
         .with_system(apply_vel_to_controller)
 }
 
@@ -57,13 +54,18 @@ pub fn setup(
             PLY_COLLIDER_RADIUS,
         ))
         .insert(KinematicCharacterController {
-            snap_to_ground: Some(CharacterLength::Absolute(5.0)),
+            snap_to_ground: Some(CharacterLength::Absolute(10.0)),
+            max_slope_climb_angle: 55.0_f32.to_radians(),
+            min_slope_slide_angle: 20.0_f32.to_radians(),
+            offset: CharacterLength::Absolute(2.0),
+            custom_mass: Some(100.0),
             ..Default::default()
         })
         .insert(SpriteBundle {
             transform: Transform::from_xyz(0.0, 100.0, 0.0),
             ..Default::default()
         })
+        .insert(transform::Transformable::default())
         .with_children(|child_builder| {
             let texture_handle = asset_server.load("spritesheet_player.png");
             let texture_atlas =
@@ -129,8 +131,8 @@ fn player_fall(
     if let Some((mut char_controller, char_controller_output)) = q.iter_mut().next() {
         if !char_controller_output.grounded {
             player.velocity.y -= player.fall_speed;
-        } else {
-            player.velocity.y = 0;
+        } else if player.velocity.y < 0.0 {
+                player.velocity.y = 0.0;
         }
     }
 }
@@ -138,58 +140,16 @@ fn player_fall(
 
 fn player_jump(
     keys: Res<Input<KeyCode>>,
-    mut q: Query<&mut Velocity, With<PlayerMarker>>,
+    mut q: Query<(&mut KinematicCharacterController, &KinematicCharacterControllerOutput), With<PlayerMarker>>,
     mut player: ResMut<Player>,
-    rapier_context: Res<RapierContext>,
-    q_collider: Query<&Collider, With<PlayerMarker>>,
-    q_transform: Query<&Transform, With<PlayerMarker>>,
 ) {
-    let mut velocity = q.iter_mut().next().unwrap();
-
-    // Check whether player is grounded
-    player.on_ground = false;
-    if velocity.linvel.y >= -30.0 {
-        let shape_pos = q_transform.iter().next().unwrap().translation.truncate()
-            + Vec2::new(0.0, -(PLY_COLLIDER_HALF_HEIGHT + 5.0));
-        let shape = &Collider::ball(PLY_COLLIDER_RADIUS - 3.0);
-        if rapier_context
-            .intersection_with_shape(
-                shape_pos,
-                0.0,
-                shape,
-                QueryFilter::new().exclude_collider(player.entity.unwrap()),
-            )
-            .is_some()
-        {
-            player.on_ground = true;
+    if let Some((mut char_controller, char_controller_output)) = q.iter_mut().next() {
+        if char_controller_output.grounded {
+            // If on_ground and up was pressed, Jump
+            if keys.just_pressed(KeyCode::Up) && char_controller_output.grounded {
+               player.velocity.y = 20.0;
+            }
         }
-        // if rapier_context
-        //     .cast_shape(
-        //         shape_pos,
-        //         0.0,
-        //         Vec2::new(0.0, -1.0),
-        //         shape,
-        //         1.0,
-        //         QueryFilter::new().exclude_collider(player.entity.unwrap()),
-        //     )
-        //     .is_some()
-        // {
-        //     player.on_ground = true;
-        // }
-        // rapier_context.intersections_with_point(
-        //     shape_pos + Vec2::new(0.0, -87.0),
-        //     QueryFilter::new().exclude_collider(player.entity.unwrap()),
-        //     |_| {
-        //         player.on_ground = true;
-        //         false
-        //     },
-        // );
-    }
-
-    // If on_ground and up was pressed, Jump
-    if keys.just_pressed(KeyCode::Up) && player.on_ground {
-        velocity.linvel = Vec2::new(velocity.linvel.x, velocity.linvel.y + JUMP_SPEED);
-        player.on_ground = false;
     }
 }
 
